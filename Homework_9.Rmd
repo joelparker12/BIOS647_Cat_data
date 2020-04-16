@@ -1,0 +1,126 @@
+---
+title: "Homework 9_Joel Parker"
+output: word_document
+---
+1. Please  go  through  the  tutorial  titled  \Building  Multivariable  Logistic  Models  UsingSAS/Stata", which can be downloaded from the d2l folder \SAS" or \Stata".  Repeatall steps of the analysis and make sure you understand everything in the document,including all commands, options, outputs, etc.  Please feel free to contact the instructorfor any questions.  You don't need to turn in anything for this part of the assignment.
+
+```{r, echo=FALSE}
+whs <-read.delim("whsasa.dat",sep = " ", header = FALSE)
+colnames(whs) <- c("age", "treatment", "cvd", "count")
+
+whsa <- c(rep(c(1,1,1),163), rep(c(1,1,0),11847),
+          rep(c(1,0,1),161), rep(c(1,0,0),11854),
+          rep(c(2,1,1),183), rep(c(2,1,0),5693),
+          rep(c(2,0,1),186), rep(c(2,0,0),5692),
+          rep(c(3,1,1), 131),rep(c(3,1,0),1917),
+          rep(c(3,0,1),175), rep(c(3,0,0),1874))
+whsa <- matrix(whsa, byrow = TRUE, ncol = 3)
+whsa <- data.frame(whsa)
+colnames(whsa) <- c("age", "asp", "cvd")
+```
+
+2.) .  The Women's Health Study randomly assigned 39,876 initially healthy women aged 45years or older to receive 100 mg of aspirin on alternate days or placebo and monitoredthem for 10 years for a  first major cardiovascular event.  The table below shows the results stratified by age at randomization. The data are also in the  lewhsasa.dat posted on the course website. The variables include:  age (scored 50, 60, or 70);  asa(0=placebo, 1=aspirin); cvd (0=no, 1=yes); and count (number of women)
+*  Use logistic regression to characterize the relationship between aspirin assignmentand the odds of CVD.
+
+a) **Use logistic regression to characterize the relationship between aspirin assignmentand the odds of CVD.**
+
++ Obtain the crude odds ratio estimate and its 95% confidence interval;
+
+```{r}
+crude <- glm(cvd~asp, data = whsa, family = binomial(link = "logit"))
+crude$coefficients
+exp(crude$coefficients)
+
+```
+*The crude odds ratio is .912.*
+
+
++ Evaluate whether age confounds the CVD-aspirin relationship by using dummyvariables for age categories.
+
+```{r}
+confound <- glm(cvd~as.factor(age)+asp, data=whsa, family=binomial(link = "logit"))
+summary(confound)
+
+```
+
+*The p-values for the 55-64 and older than 65 age groups are less than .2 in both categories thus they need to be adjusted for.* 
+
++ Calculate the age-adjusted odds ratio estimate and confidence interval.
+
+```{r}
+exp(confound$coefficients)
+exp(-.09337 + c(-1.96*.148, 1.96*1.48))
+```
+
+The adjusted odds ratio is 0.91 with a 95% confidence interval of (.6815, 16.5672).
+
+
+b) **Evaluate possible effect modification by age.**
+
++ Obtain age-speciffic odds ratio estimates and corresponding 95% confidence intervals for aspirin use (hint: in SAS you could use theby age statement in proc logistic after sorting the dataset byage;  in Stata you could useifin thelogitcommand to specify the age group, e.g.,logit cvd asa ifage==50 [fw=count], or)
+
+```{r}
+#### Group 1
+summary(group_1 <-glm(cvd~asp, data = whsa[whsa$age==1,], 
+            family = binomial(link = "logit")))
+exp(group_1$coefficients)
+exp(.01294 +c(-1.96*.11187,1.96*.11187))
+
+summary(group_2 <-glm(cvd~asp, data = whsa[whsa$age==2,], 
+            family = binomial(link = "logit")))
+exp(group_2$coefficients)
+exp(-.016 +c(-1.96*.106,1.96*.106))
+
+
+summary(group_3 <-glm(cvd~asp, data = whsa[whsa$age==3,], 
+            family = binomial(link = "logit")))
+exp(group_3$coefficients)
+exp(-.312 +c(-1.96*.12,1.96*.12))
+```
+ *The OR for the 45-54 age group is 1.01 with a CI of (0.814, 1.261).*
+ *The OR for the 55-64 age group is .984 with a confidence interval of (0.79995, 1.211380).*
+ *The odds ratio for the 65 and over age group is 0.732 with a confidence interval of (0.58, 0.93)*
+
++ Test for effect modiffcation by first including age in the model as a continuous covariate (scores 50, 60 and 70) and adding an interaction of this continuous variable with aspirin assignment;
+
+```{r}
+whsa_1 <- whsa
+whsa_1$age[whsa_1$age==1] = 50
+whsa_1$age[whsa_1$age==2] = 60
+whsa_1$age[whsa_1$age==3] = 70
+
+effect_modif <- glm(cvd~age+ asp+ age*asp, data = whsa_1, 
+                    family = binomial(link = "logit"))
+summary(effect_modif)
+
+```
+*With a pvalue of .05 when modeling age as a continuous variable, we would want to adjust for the interaction of age and asp.*
+
+
++  Test for effect modiffication using age as a categorical covariate (dummy vari-ables) and adding interactions with aspirin assignment (hint:  use likelihoodratio test to check whether the interaction terms are significant or not).
+
+```{r}
+effect_cat <- glm(cvd~as.factor(age)+asp+as.factor(age)*asp,
+                  data= whsa_1,
+                  family = binomial(link = "logit"))
+effect_cat_no <- glm(cvd~as.factor(age)+asp, data=whsa_1, family=binomial(link = "logit"))
+
+library(lmtest)
+lrtest(effect_cat,effect_cat_no)
+```
+
+Since the p-value of the likely-hood ratio is greater than .05 we do not have enough evidence to conclude the need to adjust for effect modification for age and asprine use. 
+
+c) **Describe the implications of these results for use of aspirin for primary prevention of CVD in women.**
+
+```{r}
+summary(confound)
+```
+
+Looking at the model adjust for age group asp had a p-value of 0.148 thus there is not enough evidence to conclude that asprin can significantly reduce CVD in woman. 
+
+
+
+
+
+
